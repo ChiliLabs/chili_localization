@@ -46,3 +46,11 @@ await RemoteLocalizationClient.loadTranslations(
 ```bash
 flutter pub run chili_localization:gen resources/translations/app_en.arb lib/generated/translations/remote_fallback_localization.dart
 ```
+
+## How it works
+
+- When `RemoteLocalizationClient.loadTranslations` is called it checks if there is a new version of translations on the server with provided versions
+- If new version is available, app fetches the translations from the server and saves them to local storage file
+  - If failed to download, local file with translations will be used
+    - If local file does not exists, local translations will be used
+- If there is no new version, app will use local file if exists, otherwise local translations
