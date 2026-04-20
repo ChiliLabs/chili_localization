@@ -1,9 +1,29 @@
-import 'dart:io';
+import 'dart:collection';
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:yaml/yaml.dart';
 
 void main(List<String> args) {
   final input = args.firstOrNull ?? 'resources/translations/app_en.arb';
   final output = args.lastOrNull ?? 'lib/generated/translations/remote_fallback_localization.dart';
+  var appLocalizationsFileName = 'app_localizations.dart';
+  var useNamedParameters = false;
+
+  try {
+    final yamlFile = File('l10n.yaml');
+    if (!yamlFile.existsSync()) throw Exception();
+    final data = loadYaml(yamlFile.readAsStringSync());
+    if (data is YamlMap) {
+      final localOutputFileName = data['output-localization-file'];
+      final useNamedParametersValue = data['use-named-parameters'];
+
+      if (localOutputFileName is String) appLocalizationsFileName = localOutputFileName;
+      if (useNamedParametersValue is bool) useNamedParameters = useNamedParametersValue;
+    }
+  } catch (ex) {
+    print('Warning: Failed to read l10n.yaml file, will use default configuration.');
+  }
 
   final file = File(input);
 
@@ -24,7 +44,7 @@ void main(List<String> args) {
     final rawValue = arbJson[key];
     final value = rawValue.toString();
 
-    final placeholders = <String>{};
+    final placeholders = SplayTreeSet<String>();
 
     final icuMatches = icuRegex.allMatches(value);
     for (final match in icuMatches) {
@@ -52,7 +72,7 @@ void main(List<String> args) {
 
   buffer.writeln('// GENERATED FILE - DO NOT MODIFY BY HAND.');
   buffer.writeln('// ignore_for_file: member-ordering, avoid-explicit-type-declaration, avoid-dynamic');
-  buffer.writeln('import \'app_localizations.dart\';');
+  buffer.writeln('import \'$appLocalizationsFileName\';');
   buffer.writeln('import \'package:chili_localization/src/remote_localization_manager.dart\';');
   buffer.writeln('import \'package:flutter/material.dart\';');
   buffer.writeln('import \'package:flutter_localizations/flutter_localizations.dart\';');
@@ -90,9 +110,15 @@ void main(List<String> args) {
       final params = placeholders.map((p) => 'dynamic $p').join(', ');
       final argsMap = placeholders.map((p) => "'$p': $p").join(', ');
 
+      final namedParams = placeholders.map((p) => 'required dynamic $p').join(', ');
+      final namedFallbacks = placeholders.map((p) => "$p: $p").join(', ');
+
+      final paramsFormatted = useNamedParameters ? '{ $namedParams }' : params;
+      final fallbacks = useNamedParameters ? '{ $namedFallbacks }' : placeholders.join(', ');
+
       buffer.writeln('  @override');
       buffer.writeln(
-        '  String $key($params) => RemoteLocalizationManager.getText(localeName, \'$key\', { $argsMap }) ?? fallback.$key(${placeholders.join(', ')});',
+        '  String $key($paramsFormatted) => RemoteLocalizationManager.getText(localeName, \'$key\', { $argsMap }) ?? fallback.$key($fallbacks);',
       );
       buffer.writeln(' ');
     }
