@@ -47,6 +47,22 @@ await RemoteLocalizationClient.loadTranslations(
 flutter pub run chili_localization:gen resources/translations/app_en.arb lib/generated/translations/remote_fallback_localization.dart
 ```
 
+4. Push new ARB keys to the Localization Service (optional)
+
+A project admin generates an SDK API key in the Localization Service under Settings → SDK API key. It is shown once, so store it as a secret (for example a CI environment variable).
+
+```bash
+export CHILI_LOCALIZATION_API_KEY=<key>
+dart run chili_localization:push --project <project id> --arb-dir resources/translations --dry-run
+dart run chili_localization:push --project <project id> --arb-dir resources/translations
+```
+
+- Only keys that do not exist in the project yet are added. Existing keys are never changed or deleted.
+- `@key.description` becomes the key's comment.
+- ARB files for languages the project does not support are skipped with a warning.
+- `--dry-run` prints the keys that would be added without writing anything.
+- Pushing does not publish a new translations version; publish from the Localization Service as before.
+
 ## How it works
 
 - When `RemoteLocalizationClient.loadTranslations` is called it checks if there is a new version of translations on the server with provided versions
